@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# rn-device-install — Build + install a React Native / Expo app on any platform.
+#
+# Works with Expo-managed and bare React Native projects.
+#
+# Usage (run from project root — where package.json lives):
+#   rn-device-install ios                        # iPhone/iPad (physical, local Xcode build)
+#   rn-device-install ios --eas                  # iOS EAS cloud build (no local SDK needed)
+#   rn-device-install ios --eas --profile prod   # EAS with specific profile
+#   rn-device-install ios --simulator            # iOS Simulator
+#   rn-device-install ios --tvos                 # Apple TV (physical)
+#   rn-device-install ios --tvos --simulator     # tvOS Simulator
+#   rn-device-install android                    # Android phone/tablet (physical, local Gradle)
+#   rn-device-install android --eas              # Android EAS cloud build (no local SDK needed)
+#   rn-device-install android --emulator         # Android Emulator (auto or --avd NAME)
+#   rn-device-install android --flavor fireTV    # Fire TV / Android TV / Google TV flavor
+#   rn-device-install web                        # Export for web
+#   rn-device-install web --serve                # Export + local preview
+#   rn-device-install web --deploy vercel        # Export + deploy to Vercel/Netlify/EAS
+#
+# All platform-specific flags are passed through to the platform script.
+# Run with --help-<platform> for full options:
+#   rn-device-install --help-ios
+#   rn-device-install --help-android
+#   rn-device-install --help-web
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common helpers (colours, rn_die, etc.)
+source "${SCRIPT_DIR}/lib/rn-common.sh"
+
+# Source all platform modules (defines rn_ios_run, rn_android_run, rn_web_run)
+source "${SCRIPT_DIR}/platform/rn-ios.sh"
+source "${SCRIPT_DIR}/platform/rn-android.sh"
+source "${SCRIPT_DIR}/platform/rn-web.sh"
+
+# ── Quick help ────────────────────────────────────────────────────────────────
+
+_rn_usage() {
+  cat <<'EOF'
+rn-device-install — Build + install RN/Expo on any platform
+
+  rn-device-install ios        [--eas [--profile NAME]] [--simulator] [--tvos] [--scheme S] [--config C]
+  rn-device-install android    [--eas [--profile NAME]] [--emulator] [--avd N] [--flavor F] [--config C]
+  rn-device-install web        [--serve] [--deploy vercel|netlify|eas] [--output DIR]
+
+EAS cloud builds (no local SDK needed):
+  --eas                                   use EAS cloud build instead of local build
+  --profile NAME                          EAS build profile (default: preview; use with --eas)
+
+Options common to all platforms:
+  --config Release|Debug|release|debug    build configuration (default: Release/release)
+  --no-install                            build only, skip device install
+  --verbose                               enable bash -x tracing
+
+iOS/tvOS specific:
+  --tvos, --platform tvos                 target Apple TV instead of iPhone/iPad
+  --simulator, --target simulator         use Simulator instead of physical device
+  --scheme NAME                           Xcode scheme (default: workspace filename)
+  --sim-name "iPhone 16 Pro"              specific simulator name
+
+Android specific:
+  --emulator, --target emulator           use Android Emulator
+  --avd NAME                              AVD name to launch (implies --emulator)
+  --flavor NAME                           Gradle product flavor (fireTV, androidTv, googleTv…)
+  --device SERIAL                         specific adb device serial
+
+Web specific:
+  --output DIR                            export directory (default: dist)
+  --serve                                 start local preview server after export
+  --deploy vercel|netlify|eas             deploy after export
+  --base-url PATH                         base URL for hosted deploys
+
+EOF
+}
+
+# ── Platform routing ──────────────────────────────────────────────────────────
+
+PLATFORM="${1:-}"
+[[ $# -gt 0 ]] && shift || true
+
+# Pre-scan remaining args for --eas and --profile before dispatching.
+# If --eas is present, route to rn_eas_deploy regardless of other flags.
+_RN_USE_EAS=0
+_RN_EAS_PROFILE="preview"
+_RN_REMAINING_ARGS=()
+
+for arg in "$@"; do
+  case "$arg" in
+    --eas)              _RN_USE_EAS=1 ;;
+    --profile)          : ;;  # handled below with value
+    *)                  _RN_REMAINING_ARGS+=("$arg") ;;
+  esac
+done
+
+# Re-parse to capture --profile value
+_tmp_args=("$@")
+for ((i=0; i<${#_tmp_args[@]}; i++)); do
+  if [[ "${_tmp_args[$i]}" == "--profile" && $((i+1)) -lt ${#_tmp_args[@]} ]]; then
+    _RN_EAS_PROFILE="${_tmp_args[$((i+1))]}"
+  fi
+done
+
+case "$PLATFORM" in
+  ios|tvos)
+    if [[ $_RN_USE_EAS -eq 1 ]]; then
+      rn_eas_deploy "ios" "$_RN_EAS_PROFILE"
+    else
+      # Treat bare "tvos" as shorthand for "ios --tvos"
+      [[ "$PLATFORM" == "tvos" ]] && set -- "--tvos" "$@"
+      rn_ios_run "$@"
+    fi
+    ;;
+  android)
+    if [[ $_RN_USE_EAS -eq 1 ]]; then
+      rn_eas_deploy "android" "$_RN_EAS_PROFILE"
+    else
+      rn_android_run "$@"
+    fi
+    ;;
+  web)
+    rn_web_run "$@"
+    ;;
+  --help|-h|help)
+    _rn_usage
+    ;;
+  "")
+    # Auto-detect platform when only one native dir exists
+    HAS_IOS=$([[ -d "ios"     ]] && echo 1 || echo 0)
+    HAS_AND=$([[ -d "android" ]] && echo 1 || echo 0)
+    HAS_WEB=$(python3 -c "import json; d=json.load(open('package.json')); print(1 if 'web' in str(d.get('dependencies',{})) else 0)" 2>/dev/null || echo 0)
+    if [[ $HAS_IOS -eq 1 && $HAS_AND -eq 0 ]]; then
+      rn_bold "Auto-detected: iOS"
+      if [[ $_RN_USE_EAS -eq 1 ]]; then rn_eas_deploy "ios" "$_RN_EAS_PROFILE"
+      else rn_ios_run "$@"; fi
+    elif [[ $HAS_AND -eq 1 && $HAS_IOS -eq 0 ]]; then
+      rn_bold "Auto-detected: Android"
+      if [[ $_RN_USE_EAS -eq 1 ]]; then rn_eas_deploy "android" "$_RN_EAS_PROFILE"
+      else rn_android_run "$@"; fi
+    else
+      _rn_usage
+      rn_die "Specify platform: ios | android | web"
+    fi
+    ;;
+  *)
+    _rn_usage
+    rn_die "Unknown platform: '$PLATFORM'. Use ios, android, or web."
+    ;;
+esac
