@@ -26,15 +26,17 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Use a private variable so platform scripts sourced below don't clobber this path
+# when they each compute their own SCRIPT_DIR at source-time.
+_RN_ENTRY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source common helpers (colours, rn_die, etc.)
-source "${SCRIPT_DIR}/lib/rn-common.sh"
+source "${_RN_ENTRY_DIR}/lib/rn-common.sh"
 
 # Source all platform modules (defines rn_ios_run, rn_android_run, rn_web_run)
-source "${SCRIPT_DIR}/platform/rn-ios.sh"
-source "${SCRIPT_DIR}/platform/rn-android.sh"
-source "${SCRIPT_DIR}/platform/rn-web.sh"
+source "${_RN_ENTRY_DIR}/platform/rn-ios.sh"
+source "${_RN_ENTRY_DIR}/platform/rn-android.sh"
+source "${_RN_ENTRY_DIR}/platform/rn-web.sh"
 
 # ── Quick help ────────────────────────────────────────────────────────────────
 

@@ -212,7 +212,7 @@ rn_eas_deploy() {
   # Login if not already authenticated
   npx eas whoami &>/dev/null || npx eas login
 
-  npx eas build --platform "$platform" --profile "$profile" --non-interactive
+  npx eas build --platform "$platform" --profile "$profile"
 
   echo ""
   rn_green "✅  EAS build queued."
