@@ -42,6 +42,33 @@ Steps 2–3 are one-time per machine. Steps 1 + 4 repeat when you want to push a
 | `--verbose` | off | `set -x` |
 | `--tvos` | — | Shorthand for `--platform tvos` |
 | `--simulator` | — | Shorthand for `--target simulator` |
+| `--apple-team TEAM_ID` | see below | EAS only: override Apple Developer Team ID |
+| `--profile NAME` | `preview` | EAS only: build profile from `eas.json` |
+
+### Apple Team selection (EAS builds only)
+
+Resolution order — first non-empty value wins:
+
+1. `--apple-team TEAM_ID` flag
+2. `APPLE_TEAM_ID` environment variable
+3. `~/.claude/apple-team` file (machine-wide default)
+
+**Set a machine-wide default** (avoids passing the flag every time):
+
+```bash
+echo "YOUR_TEAM_ID" > ~/.claude/apple-team
+```
+
+**Find your personal Team ID** — sign in at developer.apple.com → Account → Membership → Team ID.
+Or run `npx eas credentials --platform ios` and EAS will list available teams.
+
+**One-off override** (without changing the default):
+
+```bash
+~/.claude/scripts/rn-device-install ios --eas --apple-team A1B2C3D4E5
+# or via env var:
+APPLE_TEAM_ID=A1B2C3D4E5 npm run deploy:ios
+```
 
 ## What the script does
 

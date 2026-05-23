@@ -190,12 +190,31 @@ rn_configure_project() {
 # Triggers an EAS cloud build for any Expo project. Works from any project root
 # that has an eas.json. No local SDK or signing config required.
 #
-# Usage: rn_eas_deploy <platform> [profile]
-#   platform: ios | android
-#   profile:  preview (default) | production | development | any eas.json profile
+# Usage: rn_eas_deploy <platform> [profile] [apple_team_id]
+#   platform:      ios | android
+#   profile:       preview (default) | production | development | any eas.json profile
+#   apple_team_id: override Apple Team ID (iOS only). Resolution order:
+#                    1. explicit arg
+#                    2. APPLE_TEAM_ID env var
+#                    3. ~/.claude/apple-team file (machine-wide default)
+#
+# To set a machine-wide default team:
+#   echo "YOUR_TEAM_ID" > ~/.claude/apple-team
 rn_eas_deploy() {
   local platform="${1:?platform required}"  # ios | android
   local profile="${2:-preview}"
+  local apple_team="${3:-}"
+
+  # Apple Team resolution (iOS only — Android ignores this)
+  if [[ "$platform" == "ios" ]]; then
+    [[ -z "$apple_team" && -n "${APPLE_TEAM_ID:-}" ]] && apple_team="$APPLE_TEAM_ID"
+    if [[ -z "$apple_team" && -f "$HOME/.claude/apple-team" ]]; then
+      apple_team=$(tr -d '[:space:]' < "$HOME/.claude/apple-team")
+    fi
+    if [[ -n "$apple_team" ]]; then
+      export EXPO_APPLE_TEAM_ID="$apple_team"
+    fi
+  fi
 
   rn_check_project_root
 
@@ -207,6 +226,7 @@ rn_eas_deploy() {
 
   rn_bold "☁️   EAS cloud build: $platform ($profile)…"
   echo "    Project: $(rn_detect_app_name)"
+  [[ -n "$apple_team" ]] && echo "    Apple Team: $apple_team"
   echo ""
 
   # Login if not already authenticated

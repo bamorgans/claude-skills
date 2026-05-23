@@ -83,32 +83,37 @@ EOF
 PLATFORM="${1:-}"
 [[ $# -gt 0 ]] && shift || true
 
-# Pre-scan remaining args for --eas and --profile before dispatching.
+# Pre-scan remaining args for --eas, --profile, and --apple-team before dispatching.
 # If --eas is present, route to rn_eas_deploy regardless of other flags.
 _RN_USE_EAS=0
 _RN_EAS_PROFILE="preview"
+_RN_APPLE_TEAM=""
 _RN_REMAINING_ARGS=()
 
 for arg in "$@"; do
   case "$arg" in
     --eas)              _RN_USE_EAS=1 ;;
     --profile)          : ;;  # handled below with value
+    --apple-team)       : ;;  # handled below with value
     *)                  _RN_REMAINING_ARGS+=("$arg") ;;
   esac
 done
 
-# Re-parse to capture --profile value
+# Re-parse to capture --profile and --apple-team values
 _tmp_args=("$@")
 for ((i=0; i<${#_tmp_args[@]}; i++)); do
   if [[ "${_tmp_args[$i]}" == "--profile" && $((i+1)) -lt ${#_tmp_args[@]} ]]; then
     _RN_EAS_PROFILE="${_tmp_args[$((i+1))]}"
+  fi
+  if [[ "${_tmp_args[$i]}" == "--apple-team" && $((i+1)) -lt ${#_tmp_args[@]} ]]; then
+    _RN_APPLE_TEAM="${_tmp_args[$((i+1))]}"
   fi
 done
 
 case "$PLATFORM" in
   ios|tvos)
     if [[ $_RN_USE_EAS -eq 1 ]]; then
-      rn_eas_deploy "ios" "$_RN_EAS_PROFILE"
+      rn_eas_deploy "ios" "$_RN_EAS_PROFILE" "$_RN_APPLE_TEAM"
     else
       # Treat bare "tvos" as shorthand for "ios --tvos"
       [[ "$PLATFORM" == "tvos" ]] && set -- "--tvos" "$@"
@@ -135,11 +140,11 @@ case "$PLATFORM" in
     HAS_WEB=$(python3 -c "import json; d=json.load(open('package.json')); print(1 if 'web' in str(d.get('dependencies',{})) else 0)" 2>/dev/null || echo 0)
     if [[ $HAS_IOS -eq 1 && $HAS_AND -eq 0 ]]; then
       rn_bold "Auto-detected: iOS"
-      if [[ $_RN_USE_EAS -eq 1 ]]; then rn_eas_deploy "ios" "$_RN_EAS_PROFILE"
+      if [[ $_RN_USE_EAS -eq 1 ]]; then rn_eas_deploy "ios" "$_RN_EAS_PROFILE" "$_RN_APPLE_TEAM"
       else rn_ios_run "$@"; fi
     elif [[ $HAS_AND -eq 1 && $HAS_IOS -eq 0 ]]; then
       rn_bold "Auto-detected: Android"
-      if [[ $_RN_USE_EAS -eq 1 ]]; then rn_eas_deploy "android" "$_RN_EAS_PROFILE"
+      if [[ $_RN_USE_EAS -eq 1 ]]; then rn_eas_deploy "android" "$_RN_EAS_PROFILE" "$_RN_APPLE_TEAM"
       else rn_android_run "$@"; fi
     else
       _rn_usage
