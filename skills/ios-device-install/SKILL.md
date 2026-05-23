@@ -49,9 +49,12 @@ Steps 2–3 are one-time per machine. Steps 1 + 4 repeat when you want to push a
 
 Resolution order — first non-empty value wins:
 
-1. `--apple-team TEAM_ID` flag
-2. `APPLE_TEAM_ID` environment variable
-3. `~/.claude/apple-team` file (machine-wide default)
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 | `--apple-team` flag | `rn-device-install ios --eas --apple-team A1B2C3D4` |
+| 2 | `EXPO_APPLE_TEAM_ID` env var | Official EAS var — already used by CI / power users |
+| 3 | `APPLE_TEAM_ID` env var | Shorter convenience alias |
+| 4 | `~/.claude/apple-team` file | Machine-wide default (one-time setup) |
 
 **Set a machine-wide default** (avoids passing the flag every time):
 
@@ -59,14 +62,17 @@ Resolution order — first non-empty value wins:
 echo "YOUR_TEAM_ID" > ~/.claude/apple-team
 ```
 
-**Find your personal Team ID** — sign in at developer.apple.com → Account → Membership → Team ID.
-Or run `npx eas credentials --platform ios` and EAS will list available teams.
+**Find your Team ID** — sign in at developer.apple.com → Account → Membership → Team ID.
+Or run `npx eas credentials --platform ios` and EAS will list all teams tied to your Apple ID.
 
-**One-off override** (without changing the default):
+**One-off override** without changing the default:
 
 ```bash
+# via flag
 ~/.claude/scripts/rn-device-install ios --eas --apple-team A1B2C3D4E5
-# or via env var:
+# via EAS's native env var (also works in CI)
+EXPO_APPLE_TEAM_ID=A1B2C3D4E5 npm run deploy:ios
+# via short alias
 APPLE_TEAM_ID=A1B2C3D4E5 npm run deploy:ios
 ```
 

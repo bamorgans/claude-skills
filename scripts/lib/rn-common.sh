@@ -206,8 +206,14 @@ rn_eas_deploy() {
   local apple_team="${3:-}"
 
   # Apple Team resolution (iOS only — Android ignores this)
+  # Resolution order:
+  #   1. explicit arg            --apple-team TEAM_ID
+  #   2. EXPO_APPLE_TEAM_ID      official EAS env var (already set by power users / CI)
+  #   3. APPLE_TEAM_ID           short convenience alias
+  #   4. ~/.claude/apple-team    machine-wide default (one-time setup)
   if [[ "$platform" == "ios" ]]; then
-    [[ -z "$apple_team" && -n "${APPLE_TEAM_ID:-}" ]] && apple_team="$APPLE_TEAM_ID"
+    [[ -z "$apple_team" && -n "${EXPO_APPLE_TEAM_ID:-}" ]] && apple_team="$EXPO_APPLE_TEAM_ID"
+    [[ -z "$apple_team" && -n "${APPLE_TEAM_ID:-}" ]]      && apple_team="$APPLE_TEAM_ID"
     if [[ -z "$apple_team" && -f "$HOME/.claude/apple-team" ]]; then
       apple_team=$(tr -d '[:space:]' < "$HOME/.claude/apple-team")
     fi
