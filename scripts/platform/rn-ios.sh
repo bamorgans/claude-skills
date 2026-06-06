@@ -211,6 +211,20 @@ rn_ios_build_and_install() {
     app=$(find "$sim_products_dir" -maxdepth 1 -name "*.app" 2>/dev/null | head -1)
   fi
 
+  # Fallback: Xcode defaults to DerivedData when SYMROOT isn't overridden.
+  # Search by scheme name so we don't pick up a stale build from another project.
+  if [[ -z "$app" ]]; then
+    local dd_suffix
+    if [[ "$target" == "simulator" ]]; then
+      [[ "$apple_platform" == "tvos" ]] && dd_suffix="appletvsimulator" || dd_suffix="iphonesimulator"
+    else
+      [[ "$apple_platform" == "tvos" ]] && dd_suffix="appletvos" || dd_suffix="iphoneos"
+    fi
+    app=$(find ~/Library/Developer/Xcode/DerivedData -maxdepth 5 \
+      -path "*/Build/Products/${configuration}-${dd_suffix}/${scheme}.app" \
+      2>/dev/null | head -1)
+  fi
+
   [[ -n "$app" ]] || rn_die "Cannot find .app after build.\nCheck $build_log"
   rn_green "✅  Build succeeded: $app"
 
