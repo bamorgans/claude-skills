@@ -38,9 +38,12 @@ _rn_ios_find_device_udid() {
       | grep -iE "$pattern" \
       | head -1 || true)
     if [[ -n "$device_raw" ]]; then
-      udid=$(echo "$device_raw" | awk '{print $3}')
-      device_name=$(echo "$device_raw" | awk '{print $1}')
-      device_model=$(echo "$device_raw" | awk '{for(i=5;i<=NF;i++) printf $i" "; print ""}' | xargs 2>/dev/null || echo "")
+      # Extract UUID by pattern — column-based awk breaks when device names contain spaces
+      udid=$(echo "$device_raw" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' | head -1)
+      # Name is everything before the .coredevice.local hostname field
+      device_name=$(echo "$device_raw" | sed 's/[[:space:]]*[A-Za-z0-9._-]*\.coredevice\.local.*//' | xargs)
+      # Model is everything after the UUID + state column
+      device_model=$(echo "$device_raw" | sed "s/.*${udid}[[:space:]]*//" | awk '{print $2" "$3" "$4}' | xargs 2>/dev/null || echo "")
       echo "${udid}|${device_name}|${device_model}"
       return 0
     fi
@@ -66,23 +69,30 @@ _rn_ios_find_simulator_udid() {
   local os_filter
   [[ "$apple_platform" == "tvos" ]] && os_filter="tvOS" || os_filter="iOS"
 
+  # ugrep (drop-in grep replacement) treats patterns starting with "--" as flags;
+  # use awk to extract the OS section instead of grep to avoid this.
+  _rn_extract_sim_section() {
+    local filter="$1"
+    awk "/^-- ${filter}/{found=1; next} found && /^-- /{found=0} found{print}"
+  }
+
   if [[ -n "$sim_name" ]]; then
     # Find specific simulator by name
     xcrun simctl list devices available 2>/dev/null \
-      | grep -A200 "-- $os_filter" | grep -B200 "^-- " \
-      | grep "$sim_name" | grep -oE '[0-9A-F-]{36}' | head -1 || true
+      | _rn_extract_sim_section "$os_filter" \
+      | grep -- "$sim_name" | grep -oE '[0-9A-F-]{36}' | head -1 || true
   else
     # First booted simulator of the right OS
     local booted
     booted=$(xcrun simctl list devices booted 2>/dev/null \
-      | grep -A200 "-- $os_filter" | grep -B200 "^-- " \
+      | _rn_extract_sim_section "$os_filter" \
       | grep -oE '[0-9A-F-]{36}' | head -1 || true)
     if [[ -n "$booted" ]]; then
       echo "$booted"; return 0
     fi
     # No booted sim: return first available
     xcrun simctl list devices available 2>/dev/null \
-      | grep -A200 "-- $os_filter" | grep -B200 "^-- " \
+      | _rn_extract_sim_section "$os_filter" \
       | grep -oE '[0-9A-F-]{36}' | head -1 || true
   fi
 }
