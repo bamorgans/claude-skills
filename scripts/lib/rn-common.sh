@@ -55,7 +55,7 @@ rn_detect_framework() {
 # Creates a temp log file, prints its path, and exports BUILD_LOG.
 rn_start_build_log() {
   local platform="${1:-build}"
-  BUILD_LOG=$(mktemp "/tmp/rn-${platform}-build-XXXXXX.log")
+  BUILD_LOG=$(mktemp "/tmp/rn-${platform}-build-XXXXXX")
   export BUILD_LOG
   echo "$BUILD_LOG"
 }
