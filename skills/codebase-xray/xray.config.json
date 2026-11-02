@@ -1,0 +1,14 @@
+{
+  "version": "2",
+  "_comment": "codebase-xray config. policy maps pipeline phases to model tier aliases (opus|sonnet|haiku). Aliases resolve to canonical IDs via scripts/models.py, optionally overridden by a modelAliases object in this file (e.g. {\"opus\": \"claude-opus-4-8\"}). Set personas to a list of slugs to run a subset; null = all 14. components is the default component set when the user names none: 'core', 'all', or a list of slugs from {core, ui-inventory, sitemap, graphql, server, ai, redesign}.",
+  "policy": {
+    "extract": "haiku",
+    "persona": "sonnet",
+    "deep_dive": "sonnet",
+    "synthesis": "opus"
+  },
+  "personas": null,
+  "components": "core",
+  "top_n": 12,
+  "concurrency": 6
+}

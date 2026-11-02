@@ -1,7 +1,7 @@
 # claude-skills
 
-Claude Code skills and scripts for React Native / Expo development.
-Platform-generic — works with any Expo or bare RN project.
+Claude Code skills and scripts, mostly for React Native / Expo development.
+The device and deploy skills are platform-generic — they work with any Expo or bare RN project.
 
 ## Install
 
@@ -20,6 +20,7 @@ Updates: `git pull` (symlinks pick up changes automatically).
 | `ios-device-install` | iPhone, iPad, Apple TV, tvOS Simulator, EPERM errors |
 | `android-device-install` | Android phone, Android TV, Fire TV, Google TV, adb errors |
 | `web-deploy` | web export, Vercel, Netlify, EAS Hosting |
+| `codebase-xray` | "x-ray this repo", architecture report, UI inventory, site map, GraphQL / server / AI audit (any language) |
 
 ## Quick-start
 
