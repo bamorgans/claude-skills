@@ -35,8 +35,19 @@ green "  ✓ Scripts → ~/.claude/scripts/"
 # ── Skills ────────────────────────────────────────────────────────────────────
 for skill_dir in "$REPO_DIR/skills/"/*/; do
   skill_name=$(basename "$skill_dir")
-  mkdir -p ~/.claude/skills/"$skill_name"
-  ln -sf "$REPO_DIR/skills/$skill_name/SKILL.md" ~/.claude/skills/"$skill_name/SKILL.md"
+  target=~/.claude/skills/"$skill_name"
+  if [ -n "$(find "$skill_dir" -mindepth 1 -maxdepth 1 ! -name SKILL.md ! -name .DS_Store)" ]; then
+    # A skill that ships scripts or briefs next to SKILL.md has to be linked whole,
+    # or SKILL.md would point at files that are not there.
+    if [ -d "$target" ] && [ ! -L "$target" ]; then
+      yellow "  ! $target is a real directory; move it aside, then re-run to link $skill_name"
+      continue
+    fi
+    ln -sfn "$REPO_DIR/skills/$skill_name" "$target"
+  else
+    mkdir -p "$target"
+    ln -sf "$REPO_DIR/skills/$skill_name/SKILL.md" "$target/SKILL.md"
+  fi
 done
 
 green "  ✓ Skills   → ~/.claude/skills/"

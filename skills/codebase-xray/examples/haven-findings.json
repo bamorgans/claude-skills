@@ -1,0 +1,74 @@
+{
+  "_schema": "findings.json — produced by the skill's persona sub-agents + synthesis agent (Claude Code path) OR by analyze.py (API path). render_report.py merges this with the deterministic .xray fragments.",
+  "verdict": "🔴 Ship-blocker present. Sound, genuinely local-first stack undermined by the repo violating its own privacy promise (committed credentials/DBs, 0.0.0.0 bind, Windows-only launch). All red items are low-effort.",
+  "executive_summary": "Haven is a local-first private-AI workflow engine (messy text → structured, risk-flagged JSON) at 2,778 LOC. The architecture is coherent — coordinator → router → 7 agents, a privacy/budget/content middleware tier, Qdrant vector memory, and a hand-rolled GitHub-dark dashboard — and the stack choices are correct for the mission (Ollama local + budget-capped Claude + Qdrant). The problem is repo hygiene and platform reach contradicting the pitch: live Gmail credentials, .env, owner PII and 5 databases are committed to git; the server binds 0.0.0.0; one-button launch is Windows-only while the repo runs on macOS. Fix the five red items (all S-effort) and Haven is demo-ready; the higher-value work is a Data-Access Layer and a graceful-fallback path.",
+  "scorecard": [
+    {"dimension": "Backend", "status": "green", "note": "Clean FastAPI + agent router; sensible module split"},
+    {"dimension": "Middleware", "status": "green", "note": "privacy → budget → content filter chain is a real strength"},
+    {"dimension": "Frontend", "status": "yellow", "note": "Single hand-rolled dashboard; good theme, no build/tests"},
+    {"dimension": "Cloud integration", "status": "green", "note": "Budget-capped Claude fallback; on-brand local-first"},
+    {"dimension": "Reusability", "status": "yellow", "note": "Agents reusable; write_api/write_manager duplicate server/api"},
+    {"dimension": "Portability (Mac/Win/Unix)", "status": "red", "note": ".bat-only launch; ai/ venv + .exe installers committed"},
+    {"dimension": "Security / local-first", "status": "red", "note": "Credentials, PII & DBs committed; 0.0.0.0 bind"},
+    {"dimension": "Discoverability", "status": "yellow", "note": "README strong; naming split Haven/AiCloud/MyPrivateAI"},
+    {"dimension": "Error handling", "status": "yellow", "note": "3 bare except; broad catches in agents"},
+    {"dimension": "Boundaries", "status": "green", "note": "Healthy; largest file 194 LOC"},
+    {"dimension": "Graceful fallback", "status": "yellow", "note": "No offline / model-down degradation path"},
+    {"dimension": "Data-access layer", "status": "yellow", "note": "Direct Qdrant + sqlite3 calls; no local↔cloud seam"},
+    {"dimension": "Usability / one-button", "status": "red", "note": "One-button works on Windows only"},
+    {"dimension": "Expandability", "status": "green", "note": "Plugin manifest + agent registry are real extension points"},
+    {"dimension": "Observability / self-heal", "status": "yellow", "note": "/health exists; no metrics; preflight unexposed"}
+  ],
+  "recommendations": [
+    {"rank": 1, "severity": "red", "parallel": false, "title": "Purge committed secrets/DBs from git history; rotate Gmail creds", "impact": "Critical", "effort": "S", "owners": ["Security", "Support"], "evidence": "git ls-files: gmail_credentials.json, gmail_token.json, .env, *.db ×5"},
+    {"rank": 2, "severity": "red", "parallel": true, "title": "Default bind 127.0.0.1; make 0.0.0.0 an opt-in flag", "impact": "Critical", "effort": "S", "owners": ["Security", "Architect"], "evidence": "main.py:12, launcher.py:70, Dockerfile:10"},
+    {"rank": 3, "severity": "red", "parallel": true, "title": "Add start.sh/stop.sh + cross-platform launcher", "impact": "High", "effort": "S", "owners": ["Portability", "UX"], "evidence": "only .bat scripts; repo runs on darwin"},
+    {"rank": 4, "severity": "red", "parallel": true, "title": "Stop committing ai/ venv + .exe installers", "impact": "High", "effort": "S", "owners": ["Portability", "Engineer"], "evidence": "committed_venv=true; git-installer.exe, python-installer.exe"},
+    {"rank": 5, "severity": "orange", "parallel": false, "title": "Remove/gate stray OpenAI import behind local-first toggle", "impact": "High", "effort": "M", "owners": ["Security", "PM", "Marketing"], "evidence": "haven_demo.py imports openai vs local-first pitch"},
+    {"rank": 6, "severity": "orange", "parallel": true, "title": "Introduce a Data-Access Layer (local↔cloud pluggable)", "impact": "High", "effort": "M", "owners": ["Architect", "Data"], "evidence": "direct QdrantClient/sqlite3 across 5 files"},
+    {"rank": 7, "severity": "orange", "parallel": true, "title": "Graceful fallback when model/network down", "impact": "Med", "effort": "M", "owners": ["Error-handling", "Support"], "evidence": "no degradation path; 3 bare except"},
+    {"rank": 8, "severity": "yellow", "parallel": true, "title": "Unify branding Haven / AiCloud / MyPrivateAI", "impact": "Med", "effort": "S", "owners": ["PM", "Marketing", "Sales"], "evidence": "README vs Start AiCloud.spec vs Start MyPrivateAI.spec"},
+    {"rank": 9, "severity": "yellow", "parallel": true, "title": "Expose preflight as /health + metrics", "impact": "Med", "effort": "S", "owners": ["Observability"], "evidence": "core/preflight.py unexposed"},
+    {"rank": 10, "severity": "yellow", "parallel": true, "title": "Replace bare except; add CI", "impact": "Med", "effort": "M", "owners": ["Engineer", "QA"], "evidence": "3 bare except; thin tests, no CI config"}
+  ],
+  "parallel_plan": "```\nWAVE A — sequential (rewrites git history, run alone)\n  └─ Rec 1: secret purge + history rewrite + credential rotation\n\nWAVE B — parallel ⚡ (independent file sets)\n  ├─ feature/bind-localhost      (Rec 2)  → main.py, launcher.py, Dockerfile\n  ├─ feature/cross-platform-run  (Rec 3,4) → start.sh, .gitignore\n  ├─ feature/health-endpoint     (Rec 9)  → server/api.py\n  └─ feature/branding-unify      (Rec 8)  → README, *.spec, dashboard.html\n\nWAVE C — parallel ⚡ (after B lands)\n  ├─ feature/data-access-layer   (Rec 6)  → core/, memory/, security/, storage/\n  └─ feature/graceful-fallback   (Rec 7)  → agents/router.py, coordinator.py\n```\nKickoff: start Wave B's four branches in parallel: bind-localhost, cross-platform-run, health-endpoint, branding-unify",
+  "competitive": [
+    {"layer": "Local LLM", "current": "Ollama (3B/8B)", "alternatives": "LM Studio, llama.cpp, vLLM", "pros": "simple, $0, on-brand", "cons": "3B/8B weak for legal/finance extraction", "recommendation": "Keep; add Qwen2.5-7B/14B quality tier"},
+    {"layer": "Cloud fallback", "current": "Claude Haiku (capped)", "alternatives": "GPT-4o-mini, Gemini Flash", "pros": "cheap, strong, budget-guarded", "cons": "single-vendor; stray openai import", "recommendation": "Keep Claude, remove OpenAI"},
+    {"layer": "Vector DB", "current": "Qdrant (embedded)", "alternatives": "Chroma, LanceDB, sqlite-vss", "pros": "fast, production-grade", "cons": "heavy here; native dep", "recommendation": "Hold; eval LanceDB for portability"},
+    {"layer": "API", "current": "FastAPI", "alternatives": "Flask, Litestar", "pros": "async, typed, great DX", "cons": "none material", "recommendation": "Keep — ideal fit"},
+    {"layer": "Frontend", "current": "Vanilla JS + inline CSS", "alternatives": "React, Svelte, HTMX", "pros": "zero build, instant", "cons": "no components/tests; ceiling near", "recommendation": "HTMX now → Svelte if it grows"},
+    {"layer": "Packaging", "current": "PyInstaller + .bat", "alternatives": "Tauri, Briefcase, Docker", "pros": "one-file Win exe", "cons": "Windows-only; ships .exe in repo", "recommendation": "Add Docker + shell; eval Tauri"}
+  ],
+  "personas": [
+    {"name": "🔒 Security / local-first", "model": "sonnet", "findings": [
+      {"severity": "red", "title": "Committed live credentials", "detail": "Gmail OAuth creds + token tracked; existential trust break for a privacy product", "evidence": "security/gmail_credentials.json"},
+      {"severity": "red", "title": "Databases & PII in repo", "detail": "budget/finance/email/research DBs + owner name/city in config.yaml", "evidence": "config.yaml, security/*.db"},
+      {"severity": "red", "title": "0.0.0.0 bind", "detail": "LAN-exposed by default; commit advertises 10.0.0.177:8000", "evidence": "main.py:12"}
+    ]},
+    {"name": "🧭 Architect", "model": "sonnet", "findings": [
+      {"severity": "yellow", "title": "No data-access abstraction", "detail": "QdrantClient/sqlite3 instantiated directly; blocks 'cloud or local server' goal", "evidence": "memory/, security/, logs/"},
+      {"severity": "yellow", "title": "Duplicate API surface", "detail": "write_api.py/write_manager.py overlap server/api.py", "evidence": "write_api.py:124"}
+    ]},
+    {"name": "🧱 Portability", "model": "sonnet", "findings": [
+      {"severity": "red", "title": "Windows-only launch", "detail": "only .bat + PyInstaller .spec; repo runs on macOS", "evidence": "start.bat, Start AiCloud.spec"},
+      {"severity": "red", "title": "Committed venv + installers", "detail": "ai/ venv and 26MB python-installer.exe tracked", "evidence": "committed_venv=true"}
+    ]},
+    {"name": "🎨 Usability / UX", "model": "sonnet", "findings": [
+      {"severity": "yellow", "title": "Tokens inlined, color-only status", "detail": "extract to tokens.css; add colorblind-safe icons; no responsive rules", "evidence": "server/dashboard.html"}
+    ]},
+    {"name": "🩺 Observability / self-healing", "model": "sonnet", "findings": [
+      {"severity": "yellow", "title": "preflight unexposed", "detail": "good self-check seed; surface as /health + metrics for the dashboard to poll", "evidence": "core/preflight.py"}
+    ]}
+  ],
+  "models_used": [
+    {"phase": "scan.py", "model": "deterministic", "wall": "1.2s"},
+    {"phase": "diagram.py", "model": "deterministic", "wall": "0.4s"},
+    {"phase": "design_system.py", "model": "deterministic", "wall": "0.2s"},
+    {"phase": "libs.py", "model": "deterministic", "wall": "0.2s"},
+    {"phase": "extract-assist", "model": "haiku", "in": 12400, "out": 1900, "wall": "4s"},
+    {"phase": "14 personas × facts", "model": "sonnet", "in": 134000, "out": 30800, "wall": "41s (3 waves)"},
+    {"phase": "synthesis + ranking", "model": "opus", "in": 34600, "out": 4900, "wall": "23s"},
+    {"phase": "render_report.py", "model": "deterministic", "wall": "0.4s"}
+  ]
+}
