@@ -20,6 +20,7 @@ Updates: `git pull` (symlinks pick up changes automatically).
 | `ios-device-install` | iPhone, iPad, Apple TV, tvOS Simulator, EPERM errors |
 | `android-device-install` | Android phone, Android TV, Fire TV, Google TV, adb errors |
 | `web-deploy` | web export, Vercel, Netlify, EAS Hosting |
+| `tv-preview` | show any single-page HTML mockup on Fire TV, Android / Google TV, Sony TV or Fire HD, driven by the remote |
 
 ## Quick-start
 
