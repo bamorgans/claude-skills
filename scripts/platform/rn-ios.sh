@@ -103,7 +103,7 @@ _rn_ios_find_workspace() {
   local ws
   ws=$(find ios -maxdepth 1 -name "*.xcworkspace" 2>/dev/null | head -1)
   if [[ -z "$ws" ]]; then
-    rn_die "No .xcworkspace in ios/.\nRun: npx expo prebuild --platform ios\n  or: cd ios && pod install"
+    rn_die "No .xcworkspace in ios/.\nRun: $(rn_x_cmd expo) prebuild --platform ios\n  or: cd ios && pod install"
   fi
   echo "$ws"
 }
@@ -211,14 +211,33 @@ rn_ios_build_and_install() {
   fi
 
   # ── Locate .app ──────────────────────────────────────────────────────────────
+  # `|| true` on every find pipe is required: the entry point runs under
+  # `set -euo pipefail`, and find exits non-zero when the products dir does not
+  # exist — the normal case, since Xcode builds into DerivedData. Without it the
+  # script exits 1 silently right after a successful build, before install.
   local app
-  app=$(find "$products_dir" -maxdepth 1 -name "*.app" 2>/dev/null | head -1)
+  app=$(find "$products_dir" -maxdepth 1 -name "*.app" 2>/dev/null | head -1 || true)
 
   # Simulator builds may land under Build/Products/<Config>-iphonesimulator
   if [[ -z "$app" && "$target" == "simulator" ]]; then
     local sim_products_dir="ios/Build/Products/${configuration}-iphonesimulator"
     [[ "$apple_platform" == "tvos" ]] && sim_products_dir="ios/Build/Products/${configuration}-appletvsimulator"
-    app=$(find "$sim_products_dir" -maxdepth 1 -name "*.app" 2>/dev/null | head -1)
+    app=$(find "$sim_products_dir" -maxdepth 1 -name "*.app" 2>/dev/null | head -1 || true)
+  fi
+
+  # Xcode's default build location is DerivedData (no SYMROOT override above).
+  # Match on scheme + configuration + SDK, and take the newest match so a stale
+  # build of the same scheme from an older DerivedData folder is not picked.
+  if [[ -z "$app" ]]; then
+    local dd_sdk
+    if [[ "$target" == "simulator" ]]; then
+      [[ "$apple_platform" == "tvos" ]] && dd_sdk="appletvsimulator" || dd_sdk="iphonesimulator"
+    else
+      [[ "$apple_platform" == "tvos" ]] && dd_sdk="appletvos" || dd_sdk="iphoneos"
+    fi
+    app=$(find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 5 -type d \
+      -path "*/Build/Products/${configuration}-${dd_sdk}/${scheme}.app" -print0 2>/dev/null \
+      | xargs -0 ls -td 2>/dev/null | head -1 || true)
   fi
 
   [[ -n "$app" ]] || rn_die "Cannot find .app after build.\nCheck $build_log"

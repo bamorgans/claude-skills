@@ -28,13 +28,13 @@ _rn_web_build_cmd() {
 
   if [[ "$framework" == "expo" ]]; then
     # Expo managed / Expo Router
-    echo "npx expo export --platform web --output-dir ${output_dir}"
+    echo "$(rn_x_cmd expo) export --platform web --output-dir ${output_dir}"
   elif [[ -f "webpack.config.js" ]]; then
     # Bare RN + react-native-web + webpack
-    echo "npx react-native bundle --platform web --dev false --entry-file index.js --bundle-output ${output_dir}/index.bundle"
+    echo "$(rn_x_cmd react-native) bundle --platform web --dev false --entry-file index.js --bundle-output ${output_dir}/index.bundle"
   else
     # Try expo export anyway (works for SDK 50+ projects even without full managed config)
-    echo "npx expo export --platform web --output-dir ${output_dir}"
+    echo "$(rn_x_cmd expo) export --platform web --output-dir ${output_dir}"
   fi
 }
 
@@ -82,9 +82,9 @@ rn_web_build_and_deploy() {
   # ── Local preview ─────────────────────────────────────────────────────────
   if [[ "$serve" == "1" ]]; then
     rn_bold "🖥️   Starting local preview server…"
-    if command -v npx &>/dev/null; then
+    if [[ "$(rn_detect_pm)" == "pnpm" ]] || command -v npx &>/dev/null; then
       rn_green "    Opening http://localhost:8080"
-      npx serve "$output" --listen 8080
+      rn_x serve serve "$output" --listen 8080
     else
       rn_die "npx not found. Install Node.js or run: python3 -m http.server 8080 -d $output"
     fi
