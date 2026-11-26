@@ -83,7 +83,7 @@ _rn_android_find_apk() {
   local flavor="${2:-}"
 
   local search_root="android/app/build/outputs/apk"
-  local apk
+  local apk=""
 
   if [[ -n "$flavor" ]]; then
     # Flavor builds: app/build/outputs/apk/<flavor>/<config>/*.apk
@@ -228,7 +228,7 @@ rn_android_run() {
       --flavor)     export RN_ANDROID_FLAVOR="$2";  shift 2 ;;
       --target)     export RN_ANDROID_TARGET="$2";  shift 2 ;;
       --device)     export RN_ANDROID_DEVICE="$2";  shift 2 ;;
-      --avd)        export RN_ANDROID_AVD="$2";     shift 2 ;;
+      --avd)        export RN_ANDROID_AVD="$2"; export RN_ANDROID_TARGET="emulator"; shift 2 ;;  # implies --emulator
       --no-install) export RN_ANDROID_NO_INSTALL="1"; shift ;;
       --emulator)   export RN_ANDROID_TARGET="emulator"; shift ;;
       --verbose)    set -x;                         shift   ;;
