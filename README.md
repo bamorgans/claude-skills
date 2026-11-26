@@ -43,6 +43,8 @@ Updates: `git pull` (symlinks pick up changes automatically).
 ~/.claude/scripts/rn-device-install web --deploy vercel
 ```
 
+The scripts use the project's package manager: in a pnpm project (`packageManager: "pnpm@…"`, or a `pnpm-lock.yaml` with no `packageManager`) they run `pnpm exec` / `pnpm dlx` where the docs say `npx`; otherwise `npx`. `--profile` and `--apple-team` apply to EAS builds only and need `--eas`.
+
 ## Project integration
 
 Add to your project's `package.json`:

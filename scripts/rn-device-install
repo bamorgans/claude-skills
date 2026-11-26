@@ -88,14 +88,12 @@ PLATFORM="${1:-}"
 _RN_USE_EAS=0
 _RN_EAS_PROFILE="preview"
 _RN_APPLE_TEAM=""
-_RN_REMAINING_ARGS=()
+_RN_EAS_ONLY_FLAG=""   # first of --profile / --apple-team seen; both apply to EAS builds only
 
 for arg in "$@"; do
   case "$arg" in
     --eas)              _RN_USE_EAS=1 ;;
-    --profile)          : ;;  # handled below with value
-    --apple-team)       : ;;  # handled below with value
-    *)                  _RN_REMAINING_ARGS+=("$arg") ;;
+    --profile|--apple-team) if [[ -z "$_RN_EAS_ONLY_FLAG" ]]; then _RN_EAS_ONLY_FLAG="$arg"; fi ;;
   esac
 done
 
@@ -109,6 +107,15 @@ for ((i=0; i<${#_tmp_args[@]}; i++)); do
     _RN_APPLE_TEAM="${_tmp_args[$((i+1))]}"
   fi
 done
+
+# The local-build platform parsers do not know these flags and would abort with
+# "Unknown option", which reads as a typo rather than as the missing --eas.
+if [[ $_RN_USE_EAS -eq 0 && -n "$_RN_EAS_ONLY_FLAG" ]]; then
+  case "$PLATFORM" in
+    --help|-h|help) ;;
+    *) rn_die "$_RN_EAS_ONLY_FLAG only applies to EAS cloud builds — add --eas (e.g. rn-device-install ${PLATFORM:-ios} --eas $_RN_EAS_ONLY_FLAG NAME)" ;;
+  esac
+fi
 
 case "$PLATFORM" in
   ios|tvos)

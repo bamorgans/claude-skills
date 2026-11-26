@@ -7,7 +7,7 @@
 # Works with both Expo-managed and bare React Native projects.
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
-rn_red()    { printf '\033[0;31m%s\033[0m\n' "$*"; }
+rn_red()    { printf '\033[0;31m%b\033[0m\n' "$*"; }  # %b: rn_die messages carry \n line breaks
 rn_green()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
 rn_yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
 rn_bold()   { printf '\033[1m%s\033[0m\n'    "$*"; }
@@ -49,6 +49,52 @@ rn_detect_framework() {
   else
     echo "bare"
   fi
+}
+
+# ── Package manager ───────────────────────────────────────────────────────────
+# Prints "pnpm" when the project uses pnpm — package.json "packageManager" says
+# pnpm@…, or declares nothing and pnpm-lock.yaml exists — and pnpm is installed.
+# Prints "npm" otherwise. A pnpm project without pnpm on PATH warns (stderr) and
+# falls back to npm/npx rather than failing.
+rn_detect_pm() {
+  local declared
+  declared=$(python3 -c "import json; d=json.load(open('package.json')); print(str(d.get('packageManager','')).split('@')[0])" 2>/dev/null || true)
+  if [[ "$declared" == "pnpm" || ( -z "$declared" && -f "pnpm-lock.yaml" ) ]]; then
+    if command -v pnpm &>/dev/null; then
+      echo "pnpm"
+      return
+    fi
+    rn_yellow "⚠️   Project uses pnpm but pnpm is not on PATH — falling back to npx." >&2
+  fi
+  echo "npm"
+}
+
+# Prints the command prefix that runs package binary BIN, the way `npx BIN` does.
+# PKG is the npm package that ships BIN (defaults to BIN), e.g. eas → eas-cli.
+#   npm  → npx BIN
+#   pnpm → pnpm exec BIN  when the project installs BIN (node_modules/.bin/BIN)
+#          pnpm dlx PKG   otherwise (pnpm exec cannot download, unlike npx)
+rn_x_cmd() {
+  local bin="${1:?bin required}" pkg="${2:-$1}"
+  if [[ "$(rn_detect_pm)" == "pnpm" ]]; then
+    if [[ -x "node_modules/.bin/$bin" ]]; then echo "pnpm exec $bin"; else echo "pnpm dlx $pkg"; fi
+  else
+    echo "npx $bin"
+  fi
+}
+
+# Runs package binary BIN with args via rn_x_cmd: rn_x BIN PKG [args...]
+rn_x() {
+  local bin="${1:?bin required}" pkg="${2:?pkg required}"; shift 2
+  local cmd; cmd=$(rn_x_cmd "$bin" "$pkg")
+  # shellcheck disable=SC2086 — cmd is a fixed word list with no user input
+  $cmd "$@"
+}
+
+# Dies unless the runner rn_x will use (pnpm or npx) is installed.
+rn_require_pm() {
+  if [[ "$(rn_detect_pm)" == "pnpm" ]]; then return 0; fi
+  command -v npx &>/dev/null || rn_die "npx not found. Install Node.js: https://nodejs.org"
 }
 
 # ── Build log management ──────────────────────────────────────────────────────
@@ -162,7 +208,7 @@ rn_configure_project() {
         rn_red "❌  No iOS native project found (ios/*.xcworkspace missing)."
         echo ""
         echo "   Generate it with:"
-        echo "     npx expo prebuild --platform ios"
+        echo "     $(rn_x_cmd expo) prebuild --platform ios"
         echo "     cd ios && pod install && cd .."
         echo ""
         echo "   Then retry: ~/.claude/scripts/rn-device-install ios"
@@ -174,7 +220,7 @@ rn_configure_project() {
         rn_red "❌  No Android native project found (android/gradlew missing)."
         echo ""
         echo "   Generate it with:"
-        echo "     npx expo prebuild --platform android"
+        echo "     $(rn_x_cmd expo) prebuild --platform android"
         echo ""
         echo "   Then retry: ~/.claude/scripts/rn-device-install android"
         exit 1
@@ -224,10 +270,10 @@ rn_eas_deploy() {
 
   rn_check_project_root
 
-  command -v npx &>/dev/null || rn_die "npx not found. Install Node.js: https://nodejs.org"
+  rn_require_pm
 
   if [[ ! -f "eas.json" ]]; then
-    rn_die "eas.json not found.\nRun: npx eas init   to set up EAS for this project."
+    rn_die "eas.json not found.\nRun: $(rn_x_cmd eas eas-cli) init   to set up EAS for this project."
   fi
 
   rn_bold "☁️   EAS cloud build: $platform ($profile)…"
@@ -236,9 +282,9 @@ rn_eas_deploy() {
   echo ""
 
   # Login if not already authenticated
-  npx eas whoami &>/dev/null || npx eas login
+  rn_x eas eas-cli whoami &>/dev/null || rn_x eas eas-cli login
 
-  npx eas build --platform "$platform" --profile "$profile"
+  rn_x eas eas-cli build --platform "$platform" --profile "$profile"
 
   echo ""
   rn_green "✅  EAS build queued."
